@@ -10,12 +10,16 @@ go get github.com/fgergo/boringstreamer
 # Run
 
 $ boringstreamer
+
 or
+
 c:\>boringstreamer
 then use chrome to listen to music.
 
 # Help
 
 $ boringstreamer -h
+
 or
+
 c:\>boringstreamer -h
