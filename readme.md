@@ -15,7 +15,7 @@ or
 
 c:\>boringstreamer
 
-then use chrome to listen to music.
+then use chrome (or firefox etc.)  to listen to music.
 
 # Help
 
