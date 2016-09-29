@@ -1,4 +1,4 @@
-# Boringstreamer streams mp3 files via http.
+# Boringstreamer streams mp3 files via http
 
 Boringstreamer looks for mp3 files and broadcasts via http.
 Browse to listen (e.g. http://localhost:4444/)
