@@ -212,6 +212,7 @@ func (m *mux) start(path string) *mux {
 			//			sent := 0 // TODO(fgergo) remove later
 			//			lastSent := time.Now().UTC()
 			for {
+				t0:= time.Now()
 				tmp := log.Prefix()
 				if !*verbose {
 					log.SetOutput(nullwriter) // hack to silence mp3 debug/log output
@@ -240,6 +241,7 @@ func (m *mux) start(path string) *mux {
 					continue
 				}
 				m.nextFrame <- buf
+				
 				/*
 					sent += len(buf)
 					if sent >= 1*1024*1024 {
@@ -253,12 +255,15 @@ func (m *mux) start(path string) *mux {
 						sent = 0
 					}
 				*/
-				time.Sleep(f.Duration()) // TODO(fgergo) streaming is not working cotinuously, probably because of too much Sleep()
+				towait := f.Duration() - time.Now().Sub(t0)
+				if towait > 0 {
+					time.Sleep(towait)
+				} 
 			}
 		}
 	}()
 
-	// notify receiving clients about new available audio stream
+	// broadcast frame to clients
 	go func() {
 		for {
 			f := <-m.nextFrame
