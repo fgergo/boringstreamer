@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -42,7 +43,7 @@ type streamFrame []byte
 // client's event
 type broadcastResult struct {
 	qid int
-	ok  bool
+	err error
 }
 
 // After a start() mux broadcasts audio stream to it's listener clients.
@@ -212,7 +213,7 @@ func (m *mux) start(path string) *mux {
 			//			sent := 0 // TODO(fgergo) remove later
 			//			lastSent := time.Now().UTC()
 			for {
-				t0:= time.Now()
+				t0 := time.Now()
 				tmp := log.Prefix()
 				if !*verbose {
 					log.SetOutput(nullwriter) // hack to silence mp3 debug/log output
@@ -241,7 +242,7 @@ func (m *mux) start(path string) *mux {
 					continue
 				}
 				m.nextFrame <- buf
-				
+
 				/*
 					sent += len(buf)
 					if sent >= 1*1024*1024 {
@@ -258,7 +259,7 @@ func (m *mux) start(path string) *mux {
 				towait := f.Duration() - time.Now().Sub(t0)
 				if towait > 0 {
 					time.Sleep(towait)
-				} 
+				}
 			}
 		}
 	}()
@@ -271,13 +272,13 @@ func (m *mux) start(path string) *mux {
 			for _, ch := range m.clients {
 				ch <- f
 				br := <-m.result // handle quitting clients
-				if !br.ok {
+				if br.err != nil {
 					m.Lock()
 					close(m.clients[br.qid])
 					delete(m.clients, br.qid)
 					m.Unlock()
 					if *verbose {
-						log.Printf("Connection exited (qid: %v), streaming to %v connections.", br.qid, len(m.clients))
+						log.Printf("Connection exited, qid: %v, error %v. Now streaming to %v connections.", br.qid, br.err, len(m.clients))
 					}
 				}
 			}
@@ -288,7 +289,7 @@ func (m *mux) start(path string) *mux {
 }
 
 type streamHandler struct {
-	stream mux
+	stream *mux
 }
 
 // chrome and firefox play mp3 audio stream directly
@@ -297,7 +298,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	frames := make(chan streamFrame)
 	qid, br := sh.stream.subscribe(frames)
 	if qid < 0 {
-		log.Printf("New connection request denied, already serving %v connections. See -h for details.", *maxConnections)
+		log.Printf("Error: new connection request denied, already serving %v connections. See -h for details.", *maxConnections)
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
@@ -310,27 +311,37 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Server", "BoringStreamer/4.0")
 
 	// browsers need ID3 tag to identify frames as media to be played
-	// mp3 header to designate mp3 stream
+	// minimal id3 header to designate mp3 stream
 	b := []byte{0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	_, err := io.Copy(w, bytes.NewReader(b))
-	if err != nil {
-		log.Printf("Error streaming id3 tag (qid: %v), err=%v", qid, err)
-	} else {
-		// write mp3 stream to w
+	if err == nil {
+		// broadcast mp3 stream to w
+		broadcastTimeout := 4 * time.Second // timeout for slow clients
+		result := make(chan error)
 		for {
 			buf := <-frames
-			_, err = io.Copy(w, bytes.NewReader(buf))
+			go func(r chan error, b []byte) {
+				_, err = io.Copy(w, bytes.NewReader(b))
+				if err == nil {
+					w.(http.Flusher).Flush()
+				}
+				r <- err
+			}(result, buf)
+			select {
+			case err = <-result:
+				if err != nil {
+					break
+				}
+				br <- broadcastResult{qid, nil} // frame streamed, no error, send ack
+			case <-time.After(broadcastTimeout): // it's an error if io.Copy() is not finished within broadcastTimeout, ServeHTTP should exit
+				err = errors.New(fmt.Sprintf("timeout: %v", broadcastTimeout))
+			}
 			if err != nil {
 				break
 			}
-			br <- broadcastResult{qid, true}
-			w.(http.Flusher).Flush()
 		}
 	}
-	br <- broadcastResult{qid, false}
-	if *verbose {
-		log.Printf("Stopped connection (qid: %v), reason err=%v", qid, err)
-	}
+	br <- broadcastResult{qid, err} // error, send nack
 }
 
 func main() {
@@ -368,7 +379,7 @@ func main() {
 	}
 
 	// initialize and start mp3 streamer
-	http.Handle("/", streamHandler{*new(mux).start(path)})
+	http.Handle("/", streamHandler{new(mux).start(path)})
 	if *verbose {
 		fmt.Printf("Waiting for connections on %v\n", *addr)
 	}
