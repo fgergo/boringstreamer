@@ -19,8 +19,4 @@ then use chrome (or firefox etc.)  to listen to music.
 
 # Help
 
-$ boringstreamer -h
-
-or
-
-c:\>boringstreamer -h
+Use -h flag.
