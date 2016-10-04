@@ -256,9 +256,16 @@ func (m *mux) start(path string) *mux {
 						sent = 0
 					}
 				*/
-				towait := f.Duration() - time.Now().Sub(t0)
+				elapsed := time.Now().Sub(t0)
+				towait := f.Duration() - elapsed
 				if towait > 0 {
-					time.Sleep(towait)
+					if elapsed > 0 {
+						log.Printf("towait, f.Duration(): %v", f.Duration())
+						log.Printf("towait, towait: %v", towait)
+						log.Printf("towait, elapsed: %v", elapsed)
+					}
+					less := float64(towait) * 0.99 	// ipad is starving and giving up after a 2-3 minutes
+					time.Sleep(time.Duration(int(less)))
 				}
 			}
 		}
