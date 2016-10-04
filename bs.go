@@ -206,6 +206,7 @@ func (m *mux) start(path string) *mux {
 	// decode stream to frames
 	go func() {
 		nullwriter := new(nullWriter)
+		var cumwait time.Duration
 		for {
 			streamReader := <-m.nextStream
 			d := mp3.NewDecoder(streamReader)
@@ -256,16 +257,11 @@ func (m *mux) start(path string) *mux {
 						sent = 0
 					}
 				*/
-				elapsed := time.Now().Sub(t0)
-				towait := f.Duration() - elapsed
-				if towait > 0 {
-					if elapsed > 0 {
-						log.Printf("towait, f.Duration(): %v", f.Duration())
-						log.Printf("towait, towait: %v", towait)
-						log.Printf("towait, elapsed: %v", elapsed)
-					}
-					less := float64(towait) * 0.99 	// ipad is starving and giving up after a 2-3 minutes
-					time.Sleep(time.Duration(int(less)))
+				towait := f.Duration() - time.Now().Sub(t0)
+				cumwait += towait	// towait can be negative -> cumwait
+				if cumwait > 4*time.Second {
+					time.Sleep(cumwait)
+					cumwait = 0
 				}
 			}
 		}
