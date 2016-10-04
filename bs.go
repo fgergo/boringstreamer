@@ -1,6 +1,9 @@
 // Boringstreamer looks for mp3 files and broadcasts via http.
+//
 // $ boringstreamer -addr 4444 -max 42 /
+//
 // recursively looks for mp3 files starting from / and broadcasts on port 4444 for at most 42 concurrent streamer clients.
+//
 // Browse to listen (e.g. http://localhost:4444/)
 package main
 
@@ -211,8 +214,6 @@ func (m *mux) start(path string) *mux {
 			streamReader := <-m.nextStream
 			d := mp3.NewDecoder(streamReader)
 			var f mp3.Frame
-			//			sent := 0 // TODO(fgergo) remove later
-			//			lastSent := time.Now().UTC()
 			for {
 				t0 := time.Now()
 				tmp := log.Prefix()
@@ -244,21 +245,8 @@ func (m *mux) start(path string) *mux {
 				}
 				m.nextFrame <- buf
 
-				/*
-					sent += len(buf)
-					if sent >= 1*1024*1024 {
-						now := time.Now().UTC()
-						dur := now.Sub(lastSent)
-						kBps := int64(sent)*1e9/1024/dur.Nanoseconds()
-						if *verbose {
-							log.Printf("Info: sent %#v bytes in the last %v (%vkB/sec)", sent, dur, int(kBps))
-						}
-						lastSent = now
-						sent = 0
-					}
-				*/
 				towait := f.Duration() - time.Now().Sub(t0)
-				cumwait += towait	// towait can be negative -> cumwait
+				cumwait += towait // towait can be negative -> cumwait
 				if cumwait > 4*time.Second {
 					time.Sleep(cumwait)
 					cumwait = 0
@@ -359,10 +347,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	path := ""
+	path := "."
 	switch len(flag.Args()) {
 	case 0:
-		path = "."
 		if *verbose {
 			fmt.Printf("Using path %#v, see -h for details.\n", path)
 		}
