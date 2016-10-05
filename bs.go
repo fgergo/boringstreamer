@@ -136,11 +136,11 @@ func genFileList(root string, queue chan string) {
 					return nil
 				}
 				files <- path // found file
-
+				
 				return nil
 			})
 			close(files)
-			time.Sleep(1 * time.Second) // poll at least with 1Hz
+			time.Sleep(1 * time.Second) // if no files are found, poll at least with 1Hz 
 		}
 	}()
 
@@ -253,7 +253,7 @@ func (m *mux) start(path string) *mux {
 
 				towait := f.Duration() - time.Now().Sub(t0)
 				cumwait += towait // towait can be negative -> cumwait
-				if cumwait > 4*time.Second {
+				if cumwait > 1*time.Second {
 					time.Sleep(cumwait)
 					cumwait = 0
 				}
