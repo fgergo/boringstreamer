@@ -1,8 +1,14 @@
-// Boringstreamer looks for mp3 files and broadcasts via http.
+// Boringstreamer looks for mp3 files and broadcasts via http (live streaming.)
 //
-// $ boringstreamer -addr 4444 -max 42 /
+// $ boringstreamer
 //
-// recursively looks for mp3 files starting from / and broadcasts on port 4444 for at most 42 concurrent streamer clients.
+// or
+//
+// c:\>boringstreamer.exe
+//
+// recursively looks for mp3 files starting from current working directory and broadcasts on port 4444 for at most 42 concurrent http clients.
+//
+// See -h for details.
 //
 // Browse to listen (e.g. http://localhost:4444/)
 package main
@@ -120,7 +126,7 @@ func genFileList(root string, queue chan string) {
 			files := <-rescan
 			filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
-					return err
+					return nil
 				}
 				if !info.Mode().IsRegular() {
 					return nil
