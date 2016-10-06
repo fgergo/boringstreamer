@@ -1,6 +1,6 @@
 req: no more command line flags or arguments when implementing a new feature
 
-- to possibly avoid playing always the same first file, if other files can be found in 1 second of starting bs
+- possibly avoid playing always the same first file, if other files can be found in 1 second of starting bs
 - more file formats (ogg?)
 - simplify code if possible
 - stream audio from standard input, possibly needs a new flag, reconsider if it's worth it
