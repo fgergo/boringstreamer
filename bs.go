@@ -136,7 +136,7 @@ func genFileList(root string, queue chan string) {
 					return nil
 				}
 				files <- path // found file
-				
+
 				return nil
 			})
 			close(files)
