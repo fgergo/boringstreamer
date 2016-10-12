@@ -154,7 +154,8 @@ func genFileList(root string, queue chan string) {
 
 			for f := range files {
 				select {
-				case queue <- f: // start playing as soon as possible
+				case <- time.After(100*time.Millisecond):	// start playing as soon as possible, but wait at least 0.1 second for shuffling
+					queue <- f	
 					if *verbose {
 						fmt.Printf("Next: %v\n", f)
 					}
