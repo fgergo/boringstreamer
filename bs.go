@@ -39,6 +39,8 @@ var (
 	verbose        = flag.Bool("v", false, "display verbose messages")
 )
 
+var debugging bool	// controlled by hidden command line argument -debug
+
 // like /dev/null
 type nullWriter struct {
 }
@@ -85,7 +87,7 @@ func (m *mux) subscribe(ch chan streamFrame) (int, chan broadcastResult) {
 		qid++
 	}
 	m.clients[qid] = ch
-	if *verbose {
+	if debugging {
 		log.Printf("New connection (qid: %v), streaming to %v connections.", qid, len(m.clients))
 	}
 
@@ -97,7 +99,9 @@ func (m *mux) subscribe(ch chan streamFrame) (int, chan broadcastResult) {
 func stripID3Header(r io.Reader) io.Reader {
 	buf, err := ioutil.ReadAll(r)
 	if err != nil {
-		log.Printf("Error: skipping file, stripID3Header(), err=%v", err)
+		if debugging {
+			log.Printf("Error: skipping file, stripID3Header(), err=%v", err)
+		}
 		return bytes.NewReader(make([]byte, 0))
 	}
 
@@ -203,7 +207,9 @@ func (m *mux) start(path string) *mux {
 			filename := <-m.nextFile
 			f, err := os.Open(filename)
 			if err != nil {
-				log.Printf("Skipped \"%v\", err=%v", filename, err)
+				if debugging {
+					log.Printf("Skipped \"%v\", err=%v", filename, err)
+				}
 				continue
 			}
 			m.nextStream <- stripID3Header(f)
@@ -224,28 +230,28 @@ func (m *mux) start(path string) *mux {
 			for {
 				t0 := time.Now()
 				tmp := log.Prefix()
-				if !*verbose {
+				if !debugging {
 					log.SetOutput(nullwriter) // hack to silence mp3 debug/log output
 				} else {
 					log.SetPrefix("info: mp3 decode msg: ")
 				}
 				err := d.Decode(&f)
 				log.SetPrefix(tmp)
-				if !*verbose {
+				if !debugging {
 					log.SetOutput(os.Stderr)
 				}
 				if err == io.EOF {
 					break
 				}
 				if err != nil {
-					if *verbose {
+					if debugging {
 						log.Printf("Skipping frame, d.Decode() err=%v", err)
 					}
 					continue
 				}
 				buf, err := ioutil.ReadAll(f.Reader())
 				if err != nil {
-					if *verbose {
+					if debugging {
 						log.Printf("Skipping frame, ioutil.ReadAll() err=%v", err)
 					}
 					continue
@@ -275,7 +281,7 @@ func (m *mux) start(path string) *mux {
 					close(m.clients[br.qid])
 					delete(m.clients, br.qid)
 					m.Unlock()
-					if *verbose {
+					if debugging {
 						log.Printf("Connection exited, qid: %v, error %v. Now streaming to %v connections.", br.qid, br.err, len(m.clients))
 					}
 				}
@@ -349,7 +355,7 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	if len(flag.Args()) > 1 {
+	if len(flag.Args()) > 1 && flag.Args()[1] != "-debug" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -362,6 +368,9 @@ func main() {
 		}
 	case 1:
 		path = flag.Args()[0]
+	case 2:
+		path = flag.Args()[0]
+		debugging = true
 	}
 
 	if *verbose {
