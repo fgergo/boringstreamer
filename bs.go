@@ -64,10 +64,6 @@ type mux struct {
 
 	clients map[int]chan streamFrame // set of listener clients to be notified
 	result  chan broadcastResult     // clients share broadcast success-failure here
-
-	nextFile   chan string      // next file to be broadcast
-	nextStream chan io.Reader   // next raw audio stream
-	nextFrame  chan streamFrame // next audio frame
 }
 
 // subscribe(ch) adds ch to the set of channels to be received on by the clients when a new audio frame is available.
@@ -101,9 +97,9 @@ func (m *mux) start(path string) *mux {
 	m.result = make(chan broadcastResult)
 	m.clients = make(map[int]chan streamFrame)
 
-	m.nextFile = make(chan string)
-	m.nextStream = make(chan io.Reader)
-	m.nextFrame = make(chan streamFrame)
+	nextFile := make(chan string)			// next file to be broadcast
+	nextStream := make(chan io.Reader)		// next raw audio stream
+	nextFrame := make(chan streamFrame)	// next audio frame
 
 	// generate randomized list of files available from path
 	rand.Seed(time.Now().Unix()) // minimal randomness
@@ -119,8 +115,8 @@ func (m *mux) start(path string) *mux {
 				if !info.Mode().IsRegular() {
 					return nil
 				}
-				ok := strings.HasSuffix(strings.ToLower(info.Name()), ".mp3") // probably file is mp3
-				if !info.IsDir() && !ok {
+				probably := strings.HasSuffix(strings.ToLower(info.Name()), ".mp3") // probably mp3
+				if !info.IsDir() && !probably {
 					return nil
 				}
 				files <- wpath // found file
@@ -143,11 +139,10 @@ func (m *mux) start(path string) *mux {
 			for f := range files {
 				select {
 				case <- time.After(100*time.Millisecond):	// start playing as soon as possible, but wait at least 0.1 second for shuffling
-					m.nextFile <- f	
+					nextFile <- f	
 					if *verbose {
 						fmt.Printf("Next: %v\n", f)
 					}
-					continue
 				default:
 					// shuffle files for random playback
 					// (random permutation)
@@ -163,7 +158,7 @@ func (m *mux) start(path string) *mux {
 
 			// queue shuffled files
 			for _, f := range shuffled {
-				m.nextFile <- f
+				nextFile <- f
 				if *verbose {
 					fmt.Printf("Next: %v\n", f)
 				}
@@ -172,10 +167,9 @@ func (m *mux) start(path string) *mux {
 	}()
 
 	// read file
-	// TODO: rethink if it's needed or not
 	go func() {
 		for {
-			filename := <-m.nextFile
+			filename := <-nextFile
 			f, err := os.Open(filename)
 			if err != nil {
 				if debugging {
@@ -183,7 +177,7 @@ func (m *mux) start(path string) *mux {
 				}
 				continue
 			}
-			m.nextStream <- f
+			nextStream <- f
 			if *verbose {
 				fmt.Printf("Now playing: %v\n", filename)
 			}
@@ -195,7 +189,7 @@ func (m *mux) start(path string) *mux {
 		nullwriter := new(nullWriter)
 		var cumwait time.Duration
 		for {
-			streamReader := <-m.nextStream
+			streamReader := <- nextStream
 			d := mp3.NewDecoder(streamReader)
 			var f mp3.Frame
 			for {
@@ -227,7 +221,7 @@ func (m *mux) start(path string) *mux {
 					}
 					continue
 				}
-				m.nextFrame <- buf
+				nextFrame <- buf
 
 				towait := f.Duration() - time.Now().Sub(t0)
 				cumwait += towait // towait can be negative -> cumwait
@@ -242,9 +236,11 @@ func (m *mux) start(path string) *mux {
 	// broadcast frame to clients
 	go func() {
 		for {
-			f := <-m.nextFrame
+			f := <-nextFrame
 			// notify clients of new audio frame or let them quit
+			m.Lock()
 			for _, ch := range m.clients {
+				m.Unlock()
 				ch <- f
 				br := <-m.result // handle quitting clients
 				if br.err != nil {
@@ -256,7 +252,9 @@ func (m *mux) start(path string) *mux {
 						log.Printf("Connection exited, qid: %v, error %v. Now streaming to %v connections.", br.qid, br.err, len(m.clients))
 					}
 				}
+				m.Lock()
 			}
+			m.Unlock()
 		}
 	}()
 
@@ -285,8 +283,8 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.Header().Set("Server", "BoringStreamer/4.0")
 
-	// browsers need ID3 tag to identify frames as media to be played
-	// minimal id3 header to designate mp3 stream
+	// some browsers need ID3 tag to identify frames as media to be played
+	// minimal ID3 header to designate audio stream
 	b := []byte{0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	_, err := io.Copy(w, bytes.NewReader(b))
 	if err == nil {
@@ -351,7 +349,7 @@ func main() {
 	// check if path is available
 	matches, err := filepath.Glob(path)
 	if err != nil || len(matches) != 1 {
-		fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable.\n", path)
+		fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable, nothing to play.\n", path)
 		os.Exit(1)
 	}
 
