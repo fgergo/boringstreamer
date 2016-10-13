@@ -66,7 +66,7 @@ type mux struct {
 	result  chan broadcastResult     // clients share broadcast success-failure here
 
 	nextFile   chan string      // next file to be broadcast
-	nextStream chan io.Reader   // next (ID3 stripped) raw audio stream
+	nextStream chan io.Reader   // next raw audio stream
 	nextFrame  chan streamFrame // next audio frame
 }
 
@@ -94,41 +94,25 @@ func (m *mux) subscribe(ch chan streamFrame) (int, chan broadcastResult) {
 	return qid, m.result
 }
 
-// stripID3Header(r) reads file from r, strips id3v2 headers and returns the rest
-// id3v2 tag details: id3.org
-func stripID3Header(r io.Reader) io.Reader {
-	buf, err := ioutil.ReadAll(r)
-	if err != nil {
-		if debugging {
-			log.Printf("Error: skipping file, stripID3Header(), err=%v", err)
-		}
-		return bytes.NewReader(make([]byte, 0))
-	}
 
-	// TODO(fgergo) add ID3 v1 detection
-	if string(buf[:3]) != "ID3" {
-		return bytes.NewReader(buf) // no ID3 header
-	}
+// start() initializes a multiplexer for raw audio streams
+// e.g: m := new(mux).start(path)
+func (m *mux) start(path string) *mux {
+	m.result = make(chan broadcastResult)
+	m.clients = make(map[int]chan streamFrame)
 
-	// The ID3v2 tag size is encoded in four bytes
-	// where msb (bit 7) is set to zero in every byte,
-	// ie. tag size is at most 2^28 (4*8-4=28).
-	id3size := int32(buf[6])<<21 | int32(buf[7])<<14 | int32(buf[8])<<7 | int32(buf[9])
-	id3size += 10 // calculated tag size is excluding the header => +10
+	m.nextFile = make(chan string)
+	m.nextStream = make(chan io.Reader)
+	m.nextFrame = make(chan streamFrame)
 
-	return bytes.NewReader(buf[id3size:])
-}
-
-// genFileList() periodically checks for files available from root and
-// sends filenames down chan queue.
-func genFileList(root string, queue chan string) {
+	// generate randomized list of files available from path
 	rand.Seed(time.Now().Unix()) // minimal randomness
 
 	rescan := make(chan chan string)
 	go func() {
 		for {
 			files := <-rescan
-			filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			filepath.Walk(path, func(wpath string, info os.FileInfo, err error) error {
 				if err != nil {
 					return nil
 				}
@@ -139,7 +123,7 @@ func genFileList(root string, queue chan string) {
 				if !info.IsDir() && !ok {
 					return nil
 				}
-				files <- path // found file
+				files <- wpath // found file
 
 				return nil
 			})
@@ -159,7 +143,7 @@ func genFileList(root string, queue chan string) {
 			for f := range files {
 				select {
 				case <- time.After(100*time.Millisecond):	// start playing as soon as possible, but wait at least 0.1 second for shuffling
-					queue <- f	
+					m.nextFile <- f	
 					if *verbose {
 						fmt.Printf("Next: %v\n", f)
 					}
@@ -179,29 +163,16 @@ func genFileList(root string, queue chan string) {
 
 			// queue shuffled files
 			for _, f := range shuffled {
-				queue <- f
+				m.nextFile <- f
 				if *verbose {
 					fmt.Printf("Next: %v\n", f)
 				}
 			}
 		}
 	}()
-}
 
-// start() initializes a multiplexer for raw audio streams
-// e.g: m := new(mux).start(path)
-func (m *mux) start(path string) *mux {
-	m.result = make(chan broadcastResult)
-	m.clients = make(map[int]chan streamFrame)
-
-	m.nextFile = make(chan string)
-	m.nextStream = make(chan io.Reader)
-	m.nextFrame = make(chan streamFrame)
-
-	// generate randomized list of files available from path
-	genFileList(path, m.nextFile)
-
-	// read file, strip ID3 header
+	// read file
+	// TODO: rethink if it's needed or not
 	go func() {
 		for {
 			filename := <-m.nextFile
@@ -212,14 +183,14 @@ func (m *mux) start(path string) *mux {
 				}
 				continue
 			}
-			m.nextStream <- stripID3Header(f)
+			m.nextStream <- f
 			if *verbose {
 				fmt.Printf("Now playing: %v\n", filename)
 			}
 		}
 	}()
 
-	// decode stream to frames
+	// decode stream to frames and delay for frame duration
 	go func() {
 		nullwriter := new(nullWriter)
 		var cumwait time.Duration

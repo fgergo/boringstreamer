@@ -2,7 +2,6 @@ requirement for new features: no more command line flags or arguments when imple
 
 - stream files based on some heuristical url matching, using url path as a cue not as a pointer. E.g http://ipaddress:4444/liszt should play from directory "Ferenc Liszt/" or play file non-case sensitive match of "*liszt*.mp3"
 - more file formats (ogg?)
-- simplify code if possible
 - stream audio from standard input, possibly needs a new flag, reconsider if it's worth it
 
 DONE
