@@ -15,6 +15,7 @@ package main
 
 import (
 	"bytes"
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,8 +31,6 @@ import (
 	"time"
 
 	"github.com/tcolgate/mp3"
-	
-	"github.com/pkg/profile"
 )
 
 var (
@@ -168,11 +167,10 @@ func (m *mux) start(path string) *mux {
 		}
 	}()
 
-	// read file
+	// open file
 	go func() {
 		for {
 			filename := <-nextFile
-
 			f, err := os.Open(filename)
 			if err != nil {
 				if debugging {
@@ -180,14 +178,7 @@ func (m *mux) start(path string) *mux {
 				}
 				continue
 			}
-/*			buf, err := ioutil.ReadAll(f)
-			if err != nil {
-				log.Printf("Skipped \"%v\", err=%v", filename, err)
-				continue
-			}
-			nextStream <- bytes.NewReader(buf)
-*/
-			nextStream <- f
+			nextStream <- bufio.NewReaderSize(f, 1024*1024)
 			if *verbose {
 				fmt.Printf("Now playing: %v\n", filename)
 			}
@@ -328,8 +319,6 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	defer profile.Start().Stop()	// TODO(fgergo), remove after profiling is finished
-	
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [flags] [path]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Browse to listen (e.g. http://localhost:4444/)\n\nflags:\n")
