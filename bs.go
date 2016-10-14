@@ -180,14 +180,14 @@ func (m *mux) start(path string) *mux {
 				}
 				continue
 			}
-			buf, err := ioutil.ReadAll(f)
+/*			buf, err := ioutil.ReadAll(f)
 			if err != nil {
 				log.Printf("Skipped \"%v\", err=%v", filename, err)
 				continue
 			}
 			nextStream <- bytes.NewReader(buf)
-	
-			// nextStream <- f
+*/
+			nextStream <- f
 			if *verbose {
 				fmt.Printf("Now playing: %v\n", filename)
 			}
