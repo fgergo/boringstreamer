@@ -6,7 +6,7 @@
 //
 // c:\>boringstreamer.exe
 //
-// recursively looks for mp3 files starting from current working directory and broadcasts on port 4444 for at most 42 concurrent http clients.
+// recursively looks for .mp3 files starting from current working directory and broadcasts on port 4444 for at most 42 concurrent http clients.
 //
 // See -h for details.
 //
@@ -57,7 +57,7 @@ type broadcastResult struct {
 	err error
 }
 
-// After a start() mux broadcasts audio stream to it's listener clients.
+// After a start() mux broadcasts audio stream to subscribed clients (ie. to http servers).
 // Clients subscribe() and unsubscribe by writing to result chanel.
 type mux struct {
 	sync.Mutex
@@ -97,13 +97,13 @@ func (m *mux) start(path string) *mux {
 	m.result = make(chan broadcastResult)
 	m.clients = make(map[int]chan streamFrame)
 
+	// flow structure: fs -> nextFile -> nextStream -> nextFrame -> subscribed http servers -> browsers
 	nextFile := make(chan string)			// next file to be broadcast
 	nextStream := make(chan io.Reader)		// next raw audio stream
 	nextFrame := make(chan streamFrame)	// next audio frame
 
 	// generate randomized list of files available from path
 	rand.Seed(time.Now().Unix()) // minimal randomness
-
 	rescan := make(chan chan string)
 	go func() {
 		for {
@@ -283,7 +283,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.Header().Set("Server", "BoringStreamer/4.0")
 
-	// some browsers need ID3 tag to identify frames as media to be played
+	// some browsers need ID3 tag to identify first frame as audio media to be played
 	// minimal ID3 header to designate audio stream
 	b := []byte{0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	_, err := io.Copy(w, bytes.NewReader(b))
@@ -293,6 +293,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		result := make(chan error)
 		for {
 			buf := <-frames
+			
 			go func(r chan error, b []byte) {
 				_, err = io.Copy(w, bytes.NewReader(b))
 				if err == nil {
@@ -300,6 +301,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				r <- err
 			}(result, buf)
+			
 			select {
 			case err = <-result:
 				if err != nil {
@@ -309,6 +311,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case <-time.After(broadcastTimeout): // it's an error if io.Copy() is not finished within broadcastTimeout, ServeHTTP should exit
 				err = errors.New(fmt.Sprintf("timeout: %v", broadcastTimeout))
 			}
+			
 			if err != nil {
 				break
 			}
