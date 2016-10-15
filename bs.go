@@ -84,8 +84,8 @@ func (m *mux) subscribe(ch chan streamFrame) (int, chan broadcastResult) {
 		qid++
 	}
 	m.clients[qid] = ch
-	if debugging {
-		log.Printf("New connection (qid: %v), streaming to %v connections.", qid, len(m.clients))
+	if *verbose {
+		fmt.Printf("New connection (qid: %v), streaming to %v connections, at %v\n", qid, len(m.clients), time.Now().Format(time.Stamp))
 	}
 
 	return qid, m.result
@@ -251,6 +251,8 @@ func (m *mux) start(path string) *mux {
 					m.Unlock()
 					if debugging {
 						log.Printf("Connection exited, qid: %v, error %v. Now streaming to %v connections.", br.qid, br.err, len(m.clients))
+					} else if *verbose {
+						fmt.Printf("Connection exited (qid: %v), streaming to %v connections, at %v\n", br.qid, len(m.clients), time.Now().Format(time.Stamp))
 					}
 				}
 				m.Lock()
