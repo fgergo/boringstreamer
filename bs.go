@@ -73,17 +73,18 @@ type mux struct {
 // clients: qid, br := m.subscribe(ch)
 func (m *mux) subscribe(ch chan streamFrame) (int, chan broadcastResult) {
 	m.Lock()
-	defer m.Unlock()
 	// search for available qid
 	qid := 0
 	_, ok := m.clients[qid]
 	for ; ok; _, ok = m.clients[qid] {
 		if qid >= *maxConnections-1 {
+			m.Unlock()
 			return -1, nil
 		}
 		qid++
 	}
 	m.clients[qid] = ch
+	m.Unlock()
 	if *verbose {
 		fmt.Printf("New connection (qid: %v), streaming to %v connections, at %v\n", qid, len(m.clients), time.Now().Format(time.Stamp))
 	}
@@ -248,11 +249,12 @@ func (m *mux) start(path string) *mux {
 					m.Lock()
 					close(m.clients[br.qid])
 					delete(m.clients, br.qid)
+					nclients := len(m.clients)
 					m.Unlock()
 					if debugging {
-						log.Printf("Connection exited, qid: %v, error %v. Now streaming to %v connections.", br.qid, br.err, len(m.clients))
+						log.Printf("Connection exited, qid: %v, error %v. Now streaming to %v connections.", br.qid, br.err, nclients)
 					} else if *verbose {
-						fmt.Printf("Connection exited (qid: %v), streaming to %v connections, at %v\n", br.qid, len(m.clients), time.Now().Format(time.Stamp))
+						fmt.Printf("Connection exited, qid: %v. Now streaming to %v connections, at %v\n", br.qid, nclients, time.Now().Format(time.Stamp))
 					}
 				}
 				m.Lock()
