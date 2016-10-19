@@ -108,6 +108,10 @@ func (m *mux) start(path string) *mux {
 	rand.Seed(time.Now().Unix()) // minimal randomness
 	rescan := make(chan chan string)
 	go func() {
+		if path == "-" {
+			return
+		}
+
 		for {
 			files := <-rescan
 			filepath.Walk(path, func(wpath string, info os.FileInfo, err error) error {
@@ -132,6 +136,10 @@ func (m *mux) start(path string) *mux {
 
 	// buffer and shuffle
 	go func() {
+		if path == "-" {
+			return
+		}
+		
 		for {
 			files := make(chan string)
 			rescan <- files
@@ -170,6 +178,11 @@ func (m *mux) start(path string) *mux {
 
 	// open file
 	go func() {
+		if path == "-" {
+			nextStream <- os.Stdin
+			return
+		}
+
 		for {
 			filename := <-nextFile
 			f, err := os.Open(filename)
@@ -324,8 +337,9 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [flags] [path]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Browse to listen (e.g. http://localhost:4444/)\n\nflags:\n")
+		fmt.Printf("Usage: %s [flags] [path]\n", os.Args[0])
+		fmt.Printf("Streaming from standard input: %v -\n", os.Args[0])
+		fmt.Printf("Browse to listen (e.g. http://localhost:4444/)\n\nflags:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -347,15 +361,17 @@ func main() {
 		debugging = true
 	}
 
-	if *verbose {
-		fmt.Printf("Looking for files available from \"%v\" ...\n", path)
-	}
-
 	// check if path is available
-	matches, err := filepath.Glob(path)
-	if err != nil || len(matches) != 1 {
-		fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable, nothing to play.\n", path)
-		os.Exit(1)
+	if path != "-" {
+		if *verbose {
+			fmt.Printf("Looking for files available from \"%v\" ...\n", path)
+		}
+
+		matches, err := filepath.Glob(path)
+		if err != nil || len(matches) != 1 {
+			fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable, nothing to play.\n", path)
+			os.Exit(1)
+		}
 	}
 
 	// initialize and start mp3 streamer
@@ -364,8 +380,8 @@ func main() {
 		fmt.Printf("Waiting for connections on %v\n", *addr)
 	}
 
-	err = http.ListenAndServe(*addr, nil)
+	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Exiting, error: %v", err)
 	}
 }
