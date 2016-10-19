@@ -382,6 +382,7 @@ func main() {
 
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
-		log.Fatalf("Exiting, error: %v", err)
+		fmt.Fprintf(os.Stderr, "Exiting, error: %v", err)	// log.Fatalf() race with log.SetPrefix()
+		os.Exit(1)
 	}
 }
