@@ -179,7 +179,7 @@ func (m *mux) start(path string) *mux {
 	// open file
 	go func() {
 		if path == "-" {
-			nextStream <- os.Stdin
+			nextStream <-  stripID3Header(os.Stdin)
 			return
 		}
 
@@ -192,7 +192,7 @@ func (m *mux) start(path string) *mux {
 				}
 				continue
 			}
-			nextStream <- bufio.NewReaderSize(f, 1024*1024)
+			nextStream <-  stripID3Header(bufio.NewReaderSize(f, 1024*1024))
 			if *verbose {
 				fmt.Printf("Now playing: %v\n", filename)
 			}
@@ -278,6 +278,32 @@ func (m *mux) start(path string) *mux {
 
 	return m
 }
+
+// stripID3Header(r) reads file from r, strips id3v2 headers and returns the rest
+// id3v2 tag details: id3.org
+func stripID3Header(r io.Reader) io.Reader {
+	buf, err := ioutil.ReadAll(r)
+	if err != nil {
+		if debugging {
+			log.Printf("Error: skipping file, stripID3Header(), err=%v", err)
+		}
+		return bytes.NewReader(make([]byte, 0))
+	}
+
+	// TODO(fgergo) add ID3 v1 detection
+	if string(buf[:3]) != "ID3" {
+		return bytes.NewReader(buf) // no ID3 header
+	}
+
+	// The ID3v2 tag size is encoded in four bytes
+	// where msb (bit 7) is set to zero in every byte,
+	// ie. tag size is at most 2^28 (4*8-4=28).
+	id3size := int32(buf[6])<<21 | int32(buf[7])<<14 | int32(buf[8])<<7 | int32(buf[9])
+	id3size += 10 // calculated tag size is excluding the header => +10
+
+	return bytes.NewReader(buf[id3size:])
+}
+
 
 type streamHandler struct {
 	stream *mux
