@@ -1,8 +1,9 @@
 #!/bin/bash
+echo go install -v
 go install -v
 if [ $? -eq "0" ]
 then
-	boringstreamer -v
+	${PWD##*/} $*
 	exit
 fi
 echo go install failed
