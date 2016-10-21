@@ -6,7 +6,7 @@
 //
 // c:\>boringstreamer.exe
 //
-// recursively looks for .mp3 files starting from current working directory and broadcasts on port 4444 for at most 42 concurrent http clients.
+// recursively looks for .mp3 files starting from "/" and broadcasts on port 4444 for at most 42 concurrent http clients.
 //
 // See -h for details.
 //
@@ -15,7 +15,6 @@ package main
 
 import (
 	"bytes"
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,7 +39,7 @@ var (
 	verbose        = flag.Bool("v", false, "display verbose messages")
 )
 
-var debugging bool	// controlled by hidden command line argument -debug
+var debugging bool // controlled by hidden command line argument -debug
 
 // like /dev/null
 type nullWriter struct {
@@ -92,7 +91,6 @@ func (m *mux) subscribe(ch chan streamFrame) (int, chan broadcastResult) {
 	return qid, m.result
 }
 
-
 // start() initializes a multiplexer for raw audio streams
 // e.g: m := new(mux).start(path)
 func (m *mux) start(path string) *mux {
@@ -100,9 +98,9 @@ func (m *mux) start(path string) *mux {
 	m.clients = make(map[int]chan streamFrame)
 
 	// flow structure: fs -> nextFile -> nextStream -> nextFrame -> subscribed http servers -> browsers
-	nextFile := make(chan string)			// next file to be broadcast
-	nextStream := make(chan io.Reader)		// next raw audio stream
-	nextFrame := make(chan streamFrame)	// next audio frame
+	nextFile := make(chan string)       // next file to be broadcast
+	nextStream := make(chan io.Reader)  // next raw audio stream
+	nextFrame := make(chan streamFrame) // next audio frame
 
 	// generate randomized list of files available from path
 	rand.Seed(time.Now().Unix()) // minimal randomness
@@ -114,7 +112,17 @@ func (m *mux) start(path string) *mux {
 
 		for {
 			files := <-rescan
+
+			t0 := time.Now()
+			notified := false
 			filepath.Walk(path, func(wpath string, info os.FileInfo, err error) error {
+				// notify user if no audio files are found after 4 seconds of walking path recursively
+				dt := time.Now().Sub(t0)
+				if dt > 4*time.Second && !notified {
+					fmt.Printf("Still looking for first audio file under %#v to broadcast, after %v. Maybe try -h flag.\n", path, dt)
+					notified = true
+				}
+
 				if err != nil {
 					return nil
 				}
@@ -125,12 +133,13 @@ func (m *mux) start(path string) *mux {
 				if !info.IsDir() && !probably {
 					return nil
 				}
+
 				files <- wpath // found file
 
 				return nil
 			})
 			close(files)
-			time.Sleep(1 * time.Second) // if no files are found, poll at least with 1Hz 
+			time.Sleep(1 * time.Second) // if no files are found, poll at least with 1Hz
 		}
 	}()
 
@@ -139,7 +148,7 @@ func (m *mux) start(path string) *mux {
 		if path == "-" {
 			return
 		}
-		
+
 		for {
 			files := make(chan string)
 			rescan <- files
@@ -148,8 +157,8 @@ func (m *mux) start(path string) *mux {
 
 			for f := range files {
 				select {
-				case <- time.After(100*time.Millisecond):	// start playing as soon as possible, but wait at least 0.1 second for shuffling
-					nextFile <- f	
+				case <-time.After(100 * time.Millisecond): // start playing as soon as possible, but wait at least 0.1 second for shuffling
+					nextFile <- f
 					if *verbose {
 						fmt.Printf("Next: %v\n", f)
 					}
@@ -179,7 +188,7 @@ func (m *mux) start(path string) *mux {
 	// open file
 	go func() {
 		if path == "-" {
-			nextStream <-  stripID3Header(os.Stdin)
+			nextStream <- stripID3Header(os.Stdin)
 			return
 		}
 
@@ -192,7 +201,8 @@ func (m *mux) start(path string) *mux {
 				}
 				continue
 			}
-			nextStream <-  stripID3Header(bufio.NewReaderSize(f, 1024*1024))
+			// f = bufio.NewReaderSize(f, 1024*1024)
+			nextStream <- stripID3Header(f)
 			if *verbose {
 				fmt.Printf("Now playing: %v\n", filename)
 			}
@@ -204,7 +214,7 @@ func (m *mux) start(path string) *mux {
 		nullwriter := new(nullWriter)
 		var cumwait time.Duration
 		for {
-			streamReader := <- nextStream
+			streamReader := <-nextStream
 			d := mp3.NewDecoder(streamReader)
 			var f mp3.Frame
 			for {
@@ -304,7 +314,6 @@ func stripID3Header(r io.Reader) io.Reader {
 	return bytes.NewReader(buf[id3size:])
 }
 
-
 type streamHandler struct {
 	stream *mux
 }
@@ -337,12 +346,12 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		result := make(chan error)
 		for {
 			buf := <-frames
-			
+
 			go func(r chan error, b []byte) {
 				_, err = io.Copy(w, bytes.NewReader(b))
 				r <- err
 			}(result, buf)
-			
+
 			select {
 			case err = <-result:
 				if err != nil {
@@ -352,7 +361,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case <-time.After(broadcastTimeout): // it's an error if io.Copy() is not finished within broadcastTimeout, ServeHTTP should exit
 				err = errors.New(fmt.Sprintf("timeout: %v", broadcastTimeout))
 			}
-			
+
 			if err != nil {
 				break
 			}
@@ -374,7 +383,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	path := "."
+	path := "/"
 	switch len(flag.Args()) {
 	case 0:
 		if *verbose {
@@ -389,14 +398,25 @@ func main() {
 
 	// check if path is available
 	if path != "-" {
-		if *verbose {
-			fmt.Printf("Looking for files available from \"%v\" ...\n", path)
-		}
-
 		matches, err := filepath.Glob(path)
-		if err != nil || len(matches) != 1 {
+		if err != nil || len(matches) < 1 {
 			fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable, nothing to play.\n", path)
 			os.Exit(1)
+		}
+
+		err = os.Chdir(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable, nothing to play. Error: %v\n", path, err)
+			os.Exit(1)
+		}
+		path, err = os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: \"%v\" unavailable, nothing to play. Error: %v\n", path, err)
+			os.Exit(1)
+		}
+
+		if *verbose {
+			fmt.Printf("Looking for files available from \"%v\" ...\n", path)
 		}
 	}
 
@@ -408,7 +428,7 @@ func main() {
 
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Exiting, error: %v\n", err)	// log.Fatalf() race with log.SetPrefix()
+		fmt.Fprintf(os.Stderr, "Exiting, error: %v\n", err) // log.Fatalf() race with log.SetPrefix()
 		os.Exit(1)
 	}
 }

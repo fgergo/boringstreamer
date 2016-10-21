@@ -2,9 +2,10 @@ requirement for new features: when implementing a new feature, the # of flags or
 
 - stream files based on some heuristical url matching, using url path as a cue not as a pointer. E.g http://ipaddress:4444/liszt should play from directory "Ferenc Liszt/" or play file non-case sensitive match of "*liszt*.mp3"
 - more file formats, AAC, AC3, enhanced AC3)
+- profile again
 
 DONE
 - possibly avoid playing always the same first file, if other files can be found in 0.1 second of starting bs
 - added hidden -debug flag for more terse verbose mode, reserve log format for debug information
 - stream audio from standard input
-
+- change default path to "/" + "/" works on windows too
