@@ -1,6 +1,5 @@
 requirement for new features: when implementing a new feature, the # of flags or # of arguments should not grow 
 
-
 - more file formats, AAC, AC3, enhanced AC3)
 - profile again
 
@@ -12,3 +11,4 @@ DONE
 - added hidden -debug flag for more terse verbose mode, reserve log format for debug information
 - stream audio from standard input
 - change default path to "/" + "/" works on windows too
+ 

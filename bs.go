@@ -118,8 +118,8 @@ func (m *mux) start(path string) *mux {
 			filepath.Walk(path, func(wpath string, info os.FileInfo, err error) error {
 				// notify user if no audio files are found after 4 seconds of walking path recursively
 				dt := time.Now().Sub(t0)
-				if dt > 4*time.Second && !notified {
-					fmt.Printf("Still looking for first audio file under %#v to broadcast, after %v. Maybe try -h flag.\n", path, dt)
+				if dt > 4*time.Second && !notified && *verbose {
+					fmt.Printf("Still looking for first audio file under %#v to broadcast, after %v... Maybe try -h flag.\n", path, dt)
 					notified = true
 				}
 
@@ -373,9 +373,10 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [flags] [path]\n", os.Args[0])
+		fmt.Println("then browse to listen. (e.g. http://localhost:4444/)")
 		fmt.Printf("%v does not follow links.\n", os.Args[0])
-		fmt.Printf("To stream from standard input: %v -\n", os.Args[0])
-		fmt.Println("Browse to listen. (e.g. http://localhost:4444/)\n\nflags:")
+		fmt.Printf("To stream from standard input: %v -\n\n", os.Args[0])
+		fmt.Println("flags:")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
