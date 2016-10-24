@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	addr           = flag.String("addr", ":4444", "listen on address (format: :port or host:port)")
+	addr           = flag.String("addr", ":4444", "listen on address (:port or host:port)")
 	maxConnections = flag.Int("max", 42, "set maximum number of streaming connections")
 	recursively    = flag.Bool("r", true, "recursively look for music starting from path")
 	verbose        = flag.Bool("v", false, "display verbose messages")
@@ -373,8 +373,9 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [flags] [path]\n", os.Args[0])
-		fmt.Printf("Streaming from standard input: %v -\n", os.Args[0])
-		fmt.Printf("Browse to listen (e.g. http://localhost:4444/)\n\nflags:\n")
+		fmt.Printf("%v does not follow links.\n", os.Args[0])
+		fmt.Printf("To stream from standard input: %v -\n", os.Args[0])
+		fmt.Println("Browse to listen. (e.g. http://localhost:4444/)\n\nflags:")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
