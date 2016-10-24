@@ -1,3 +1,5 @@
+// Author: Gergely Födémesi fgergo@gmail.com
+
 // Boringstreamer looks for mp3 files and broadcasts via http (live streaming.)
 //
 // $ boringstreamer
