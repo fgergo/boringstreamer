@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/tcolgate/mp3"
+
+	"github.com/pkg/profile"
 )
 
 var (
@@ -350,6 +352,8 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	defer profile.Start().Stop()	// TODO(fgergo), remove after profiling is finished
+
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [flags] [path]\n", os.Args[0])
 		fmt.Println("then browse to listen. (e.g. http://localhost:4444/)")
