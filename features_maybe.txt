@@ -2,6 +2,7 @@ requirement for new features: when implementing a new feature, the # of flags or
 
 - more file formats, AAC, AC3, enhanced AC3)
 - profile again
+- ReadAll() problem with streaming from standard input -> 1. stripID3header() shall work without ReadAll(), i.e. need to parse ID3 header...
 
 NEW APP
 - stream files based on some heuristical url matching, using url path as a cue not as a pointer. E.g http://ipaddress:4444/liszt should play from directory "Ferenc Liszt/" or play file non-case sensitive match of "*liszt*.mp3"
