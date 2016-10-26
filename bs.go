@@ -34,7 +34,7 @@ import (
 
 	"github.com/tcolgate/mp3"
 
-	"github.com/pkg/profile"
+	_ "net/http/pprof"		// TODO(fgergo) remove when finished
 )
 
 var (
@@ -47,8 +47,7 @@ var (
 var debugging bool // controlled by hidden command line argument -debug
 
 // like /dev/null
-type nullWriter struct {
-}
+type nullWriter struct {}
 
 func (nw nullWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
@@ -294,7 +293,7 @@ func (m *mux) start(path string) *mux {
 }
 
 type streamHandler struct {
-	stream *mux
+	*mux
 }
 
 // chrome and firefox play mp3 audio stream directly
@@ -303,7 +302,7 @@ type streamHandler struct {
 func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	frames := make(chan streamFrame)
-	qid, br := sh.stream.subscribe(frames)
+	qid, br := sh.subscribe(frames)
 	if qid < 0 {
 		log.Printf("Error: new connection request denied, already serving %v connections. See -h for details.", *maxConnections)
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -352,8 +351,12 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	defer profile.Start().Stop()	// TODO(fgergo), remove after profiling is finished
-
+	// TODO(fgergo), remove when finished
+	// start profile serving page: http://ip.ad.dr.ess:6060/debug/pprof
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+	
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [flags] [path]\n", os.Args[0])
 		fmt.Println("then browse to listen. (e.g. http://localhost:4444/)")
@@ -405,13 +408,12 @@ func main() {
 		}
 	}
 
-	// initialize and start mp3 streamer
-	http.Handle("/", streamHandler{new(mux).start(path)})
 	if *verbose {
 		fmt.Printf("Waiting for connections on %v\n", *addr)
 	}
-
-	err := http.ListenAndServe(*addr, nil)
+	
+	// initialize and start mp3 streamer
+	err := http.ListenAndServe(*addr, streamHandler{new(mux).start(path)})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Exiting, error: %v\n", err) // log.Fatalf() race with log.SetPrefix()
 		os.Exit(1)
