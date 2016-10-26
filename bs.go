@@ -351,12 +351,6 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// TODO(fgergo), remove when finished
-	// start profile serving page: http://ip.ad.dr.ess:6060/debug/pprof
-	go func() {
-		log.Println(http.ListenAndServe(":6060", nil))
-	}()
-	
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [flags] [path]\n", os.Args[0])
 		fmt.Println("then browse to listen. (e.g. http://localhost:4444/)")
@@ -410,6 +404,14 @@ func main() {
 
 	if *verbose {
 		fmt.Printf("Waiting for connections on %v\n", *addr)
+	}
+
+	if debugging {
+		// TODO(fgergo), remove when finished
+		// start profile serving page: http://ip.ad.dr.ess:6060/debug/pprof
+		go func() {
+			log.Println(http.ListenAndServe(":6060", nil))
+		}()
 	}
 	
 	// initialize and start mp3 streamer
