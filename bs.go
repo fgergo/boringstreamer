@@ -406,8 +406,8 @@ func main() {
 		fmt.Printf("Waiting for connections on %v\n", *addr)
 	}
 
+	// TODO(fgergo), remove when finished
 	if debugging {
-		// TODO(fgergo), remove when finished
 		// start profile serving page: http://ip.ad.dr.ess:6060/debug/pprof
 		go func() {
 			log.Println(http.ListenAndServe(":6060", nil))
