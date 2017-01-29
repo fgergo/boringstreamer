@@ -324,11 +324,14 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// broadcast mp3 stream to w
 		broadcastTimeout := 44 * time.Second // timeout for slow clients
 		result := make(chan error)
+		m := sync.Mutex{}
 		for {
 			buf := <-frames
 
 			go func(r chan error, b []byte) {
+				m.Lock()
 				_, err = io.Copy(w, bytes.NewReader(b))
+				m.Unlock()
 				r <- err
 			}(result, buf)
 
