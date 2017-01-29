@@ -322,7 +322,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(w, bytes.NewReader(b))
 	if err == nil {
 		// broadcast mp3 stream to w
-		broadcastTimeout := 4 * time.Second // timeout for slow clients
+		broadcastTimeout := 44 * time.Second // timeout for slow clients
 		result := make(chan error)
 		for {
 			buf := <-frames
