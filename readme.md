@@ -27,8 +27,14 @@ Use -h flag.
 
 # Bug
 
-A browser or player feature/bug: if the sample rate or bitrate or number of channels changes during streaming, the player stops playing the stream. Usually happens when boringstreamer streams different mp3s with different sample rates (e.g. 44100 and 48000). Boringstreamer handles the differences, but the browser or other hls client stops playing mp3s.
+A browser or player feature/bug:  Usually happens when boringstreamer streams
+different mp3s with different sample rates (e.g. 44100 and 48000). If the sample
+rate or bitrate or number of channels changes during playing, the player stops
+playing the stream. Boringstreamer handles the different files, but the players stop playing mp3s.
 
-workaround 1: refresh page in the browser when mp3 playing is stopped.
+Workaround 1: Refresh page in the browser when mp3 playing is stopped.
 
-workaround 2: change all mp3s to uniform format (doesn't matter which format, it just should be uniform) (e.g: ffmpeg -i source.mp3 -vn -ar 44100 -ac 2 -ab 128 -f mp3 output.mp3)
+Workaround 2: Change all mp3s to uniform format. Doesn't matter which format, it just should be uniform.
+For example with ffmpeg:
+
+	ffmpeg -i source.mp3 -vn -ar 44100 -ac 2 -ab 128 -f mp3 output.mp3
