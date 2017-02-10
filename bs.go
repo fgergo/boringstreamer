@@ -309,13 +309,12 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Date", now.Format(http.TimeFormat))
-	w.Header().Set("Connection", "Keep-Alive")
+	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.Header().Set("Server", "BoringStreamer/4.0")
-
+	
 	// some browsers need ID3 tag to identify first frame as audio media to be played
 	// minimal ID3 header to designate audio stream
 	b := []byte{0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
