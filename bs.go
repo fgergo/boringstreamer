@@ -328,6 +328,7 @@ func (sh streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.Header().Set("Server", "BoringStreamer/4.0")
+	// w.Header().Set("Refresh", "180")	// quick hack to restart browser's audio player for different mp3 sample rates
 	
 	// some browsers need ID3 tag to identify first frame as audio media to be played
 	// minimal ID3 header to designate audio stream
