@@ -1,6 +1,4 @@
-# Sensible defaults -> no configuration files.
-
-Yes.
+Sensible defaults -> no configuration files.
 
 # Boringstreamer streams mp3 files via http
 
