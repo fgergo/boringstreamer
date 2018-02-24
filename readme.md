@@ -15,7 +15,7 @@ $ boringstreamer
 
 or
 
-c:\>boringstreamer
+c:\\>boringstreamer
 
 then use chrome (or firefox etc.)  to listen to music.
 
