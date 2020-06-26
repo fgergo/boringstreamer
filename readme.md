@@ -7,6 +7,8 @@ Browse to listen (e.g. http://localhost:4444/)
 
 # Install
 
+# set GO111MODULE=on (windows)
+# export GO111MODULE=on (anything else)
 go get github.com/fgergo/boringstreamer
 
 # Run
