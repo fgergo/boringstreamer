@@ -46,7 +46,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tcolgate/mp3"
+	"github.com/fgergo/mp3"	// this fork was only created to have a modularized version of boringstreamer. Original: github.com/tcolgate/mp3
 
 	_ "net/http/pprof"		// TODO(fgergo) remove when finished
 )
@@ -228,6 +228,7 @@ func (m *mux) start(path string) *mux {
 
 	// decode stream to frames and delay for frame duration
 	go func() {
+		skipped := 0
 		nullwriter := new(nullWriter)
 		var cumwait time.Duration
 		for {
@@ -242,7 +243,7 @@ func (m *mux) start(path string) *mux {
 				} else {
 					log.SetPrefix("info: mp3 decode msg: ")
 				}
-				err := d.Decode(&f)
+				err := d.Decode(&f, &skipped)
 				log.SetPrefix(tmp)
 				if !debugging {
 					log.SetOutput(os.Stderr)
