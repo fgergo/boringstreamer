@@ -7,7 +7,7 @@ Browse to listen (e.g. http://localhost:4444/)
 
 # Install
 
-go get github.com/fgergo/boringstreamer
+go install github.com/fgergo/boringstreamer@latest
 
 # Run
 
